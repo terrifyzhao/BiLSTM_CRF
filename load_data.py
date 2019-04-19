@@ -2,21 +2,21 @@ from tflearn.data_utils import pad_sequences, shuffle
 
 
 def load_vocab():
-    vocab = [str(line).split()[0] for line in open('input/vocab.txt').readlines()]
+    vocab = [str(line).split()[0] for line in open('input/vocab.txt', encoding='utf-8').readlines()]
     word2idx = {word: index for index, word in enumerate(vocab)}
     idx2word = {index: word for index, word in enumerate(vocab)}
     return word2idx, idx2word
 
 
 def load_tag():
-    vocab = [str(line).split()[0] for line in open('input/tags.txt').readlines()]
+    vocab = [str(line).split()[0] for line in open('input/tags.txt', encoding='utf-8').readlines()]
     tag2idx = {word: index for index, word in enumerate(vocab)}
     idx2tag = {index: word for index, word in enumerate(vocab)}
     return tag2idx, idx2tag
 
 
 def load_data():
-    with open('data/data.txt') as file:
+    with open('input/data.txt', encoding='utf-8') as file:
         X = []
         y = []
         for index, lien in enumerate(file.readlines()):

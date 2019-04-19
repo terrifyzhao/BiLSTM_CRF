@@ -15,8 +15,13 @@ X, y = load_data.load_data()
 model = Model(config)
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    _, _, score = sess.run([model.train_op, model.viterbi_sequence, model.viterbi_score],
-                           feed_dict={model.keep_prob: 0.9,
-                                 model.input_data: X,
-                                      model.labels: y})
-    print('crl score: ', score)
+    for epoch in range(1000):
+        _, loss, acc = sess.run([model.train_op, model.loss, model.accuracy],
+                                feed_dict={model.keep_prob: 0.9,
+                                           model.input_data: X,
+                                           model.labels: y})
+
+        # print('crl tag: ', tag)
+        # print('crl score: ', score)
+        print('epoch: ', epoch, ' loss: ', loss)
+        print('epoch: ', epoch, ' crl acc: ', acc)

@@ -35,6 +35,7 @@ class Model:
                                                                          scope=None)
 
         bilstm_out = tf.concat([output_fw, output_bw], axis=2)
+        bilstm_out = tf.nn.dropout(bilstm_out, self.keep_prob)
 
         # Fully connected layer.
         W = tf.get_variable(name="W", shape=[11122, 2 * self.embedding_dim, self.tag_size],
@@ -43,20 +44,25 @@ class Model:
         b = tf.get_variable(name="b", shape=[11122, self.sen_len, self.tag_size], dtype=tf.float32,
                             initializer=tf.zeros_initializer())
 
-        bilstm_out = tf.tanh(tf.matmul(bilstm_out, W) + b)
+        self.logits = tf.tanh(tf.matmul(bilstm_out, W) + b)
+        self.prediction = tf.cast(tf.argmax(self.logits, axis=-1), tf.int32)
+        sequence_lengths = tf.tile([self.sen_len], [11122])
 
         # Linear-CRF.
-        log_likelihood, self.transition_params = tf.contrib.crf.crf_log_likelihood(bilstm_out, self.labels,
-                                                                                   tf.tile(np.array([self.sen_len]),
-                                                                                           np.array([11122])))
+        log_likelihood, self.transition_params = tf.contrib.crf.crf_log_likelihood(self.logits,
+                                                                                   self.labels,
+                                                                                   sequence_lengths)
 
-        loss = tf.reduce_mean(-log_likelihood)
+        self.loss = tf.reduce_mean(-log_likelihood)
 
         # Compute the viterbi sequence and score (used for prediction and test time).
-        self.viterbi_sequence, self.viterbi_score = tf.contrib.crf.crf_decode(bilstm_out, self.transition_params,
-                                                                         tf.tile(np.array([self.sen_len]),
-                                                                                 np.array([11122])))
+        # self.tag, self.viterbi_score = tf.contrib.crf.crf_decode(bilstm_out,
+        #                                                          self.transition_params,
+        #                                                          sequence_lengths)
+
+        correct_prediction = tf.equal(tf.cast(self.prediction, tf.int32), self.labels)
+        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name="Accuracy")
 
         # Training ops.
         optimizer = tf.train.AdamOptimizer(self.lr)
-        self.train_op = optimizer.minimize(loss)
+        self.train_op = optimizer.minimize(self.loss)
