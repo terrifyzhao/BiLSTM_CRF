@@ -12,8 +12,9 @@ class Model:
         self.sen_len = config["sen_len"]
         self.tag_size = config["tag_size"]
 
-        self.input_data = tf.placeholder(tf.int32, shape=[None, self.sen_len], name="input_data")
-        self.labels = tf.placeholder(tf.int32, shape=[None, self.sen_len], name="labels")
+        self.input_data = tf.placeholder(tf.int32, shape=[None, None], name="input_data")
+        self.labels = tf.placeholder(tf.int32, shape=[None, None], name="labels")
+        self.seq_len = tf.placeholder(tf.int32, shape=[None], name='seq_len')
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")
 
         with tf.variable_scope("bilstm_crf") as scope:
@@ -30,28 +31,29 @@ class Model:
         (output_fw, output_bw), states = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,
                                                                          lstm_bw_cell,
                                                                          input_embedded,
+                                                                         sequence_length=self.seq_len,
                                                                          dtype=tf.float32,
-                                                                         time_major=False,
-                                                                         scope=None)
+                                                                         time_major=False)
 
         bilstm_out = tf.concat([output_fw, output_bw], axis=2)
         bilstm_out = tf.nn.dropout(bilstm_out, self.keep_prob)
 
         # Fully connected layer.
-        W = tf.get_variable(name="W", shape=[11122, 2 * self.embedding_dim, self.tag_size],
+        W = tf.get_variable(name="W", shape=[2 * self.embedding_dim, self.tag_size],
                             dtype=tf.float32)
 
-        b = tf.get_variable(name="b", shape=[11122, self.sen_len, self.tag_size], dtype=tf.float32,
+        b = tf.get_variable(name="b", shape=[self.tag_size], dtype=tf.float32,
                             initializer=tf.zeros_initializer())
 
-        self.logits = tf.tanh(tf.matmul(bilstm_out, W) + b)
+        self.logits = tf.tanh(tf.matmul(tf.reshape(bilstm_out, [-1, 2 * self.embedding_dim]), W) + b)
+        self.logits = tf.reshape(self.logits, [-1, 15, self.tag_size])
         self.prediction = tf.cast(tf.argmax(self.logits, axis=-1), tf.int32)
-        sequence_lengths = tf.tile([self.sen_len], [11122])
+        # sequence_lengths = tf.tile([self.sen_len], [11122])
 
         # Linear-CRF.
         log_likelihood, self.transition_params = tf.contrib.crf.crf_log_likelihood(self.logits,
                                                                                    self.labels,
-                                                                                   sequence_lengths)
+                                                                                   self.seq_len)
 
         self.loss = tf.reduce_mean(-log_likelihood)
 
